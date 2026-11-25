@@ -45,6 +45,14 @@ pilotage, ce qui permet de tester le workflow de bout en bout.
 
 ## Lancer l'application
 
+### Sous Windows (le plus simple)
+
+Double-cliquez sur **`demarrer.bat`** : il vérifie Python, installe les
+composants au premier lancement, démarre l'application et ouvre automatiquement
+le navigateur sur http://127.0.0.1:5000
+
+### Manuellement (Windows, Mac, Linux)
+
 ```bash
 pip install -r requirements.txt
 python app.py
