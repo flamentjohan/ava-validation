@@ -1,6 +1,7 @@
 """Demarrage de l'application AVA et ouverture automatique du navigateur."""
 import os
 import socket
+import sys
 import threading
 import time
 import traceback
@@ -8,6 +9,10 @@ import webbrowser
 
 HOST, PORT = "127.0.0.1", 5000
 URL = f"http://{HOST}:{PORT}"
+
+BASE = os.path.dirname(os.path.abspath(__file__))
+if BASE not in sys.path:
+    sys.path.insert(0, BASE)
 
 
 def open_browser_when_ready():
