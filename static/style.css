@@ -97,6 +97,7 @@ small { color: var(--muted); }
   position: fixed; inset: 0; background: rgba(20, 30, 45, .55);
   display: flex; align-items: center; justify-content: center; z-index: 50;
 }
+.modal-backdrop[hidden] { display: none; }
 .modal {
   background: #fff; border-radius: 10px; padding: 1.5rem 1.8rem;
   max-width: 480px; box-shadow: 0 10px 40px rgba(0,0,0,.3);
