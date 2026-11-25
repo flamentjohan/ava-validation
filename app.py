@@ -1,12 +1,14 @@
 """AVA - Application de suivi de validation de propositions de projet."""
 import os
+import re
 import secrets
 import sqlite3
-from datetime import datetime
+import uuid
+from datetime import datetime, timedelta
 from pathlib import Path
 
 from flask import (Flask, flash, g, redirect, render_template, request,
-                   session, url_for)
+                   send_file, url_for)
 
 from mailer import send_validation_email, send_final_confirmation
 
@@ -14,8 +16,12 @@ from mailer import send_validation_email, send_final_confirmation
 BASE_DIR = Path(__file__).resolve().parent
 DB_PATH = BASE_DIR / os.environ.get("AVA_DB_PATH", "ava.db")
 
+UPS = ["A2", "DELVERT", "FAISSOLE", "FILET BLEU", "FOURNIL", "KERLYS",
+       "MLC", "MSA", "MSB", "MSP", "SOLARYS"]
 INTERNAL_AGRO_ROLES = ["Développeur", "Directeur commercial", "Adhérent"]
 ITMAI_ROLES = ["Acheteur", "Responsable marketing", "CEQ"]
+VALIDATOR_STATUSES = ["en_attente", "mail_envoye", "valide", "refuse"]
+PROJECT_STATUSES = ["phase_interne", "phase_externe", "valide", "refuse"]
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("AVA_SECRET_KEY", secrets.token_hex(32))
@@ -67,6 +73,7 @@ def init_db():
             email TEXT NOT NULL,
             token TEXT NOT NULL UNIQUE,
             status TEXT NOT NULL DEFAULT 'en_attente',
+            sent_at TEXT,
             answered_at TEXT
         );
 
@@ -80,10 +87,25 @@ def init_db():
             delivered INTEGER NOT NULL DEFAULT 0,
             error TEXT
         );
+
+        CREATE TABLE IF NOT EXISTS images (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            project_id INTEGER,
+            mime TEXT NOT NULL,
+            data BLOB NOT NULL,
+            created_at TEXT NOT NULL
+        );
         """
     )
+    _ensure_column(db, "validators", "sent_at", "TEXT")
     db.commit()
     db.close()
+
+
+def _ensure_column(db, table, column, decl):
+    cols = [r[1] for r in db.execute(f"PRAGMA table_info({table})")]
+    if column not in cols:
+        db.execute(f"ALTER TABLE {table} ADD COLUMN {column} {decl}")
 
 
 init_db()
@@ -96,10 +118,17 @@ def validator_status_label(status):
             "refuse": "Refusé"}.get(status, status)
 
 
+def project_status_label(status):
+    return {"phase_interne": "Validation interne en cours",
+            "phase_externe": "Validation ITMAI en cours",
+            "valide": "Projet validé",
+            "refuse": "Projet refusé"}.get(status, status)
+
+
 def record_email(db, project_id, recipient, subject, body, error=None):
     db.execute(
-        "INSERT INTO emails_log (project_id, recipient, subject, body, sent_at,"
-        " delivered, error) VALUES (?,?,?,?,?,?,?)",
+        "INSERT INTO emails_log (project_id, recipient, subject, body,"
+        " sent_at, delivered, error) VALUES (?,?,?,?,?,?,?)",
         (project_id, recipient, subject, body,
          datetime.now().isoformat(timespec="seconds"),
          0 if error else 1, error),
@@ -108,9 +137,10 @@ def record_email(db, project_id, recipient, subject, body, error=None):
 
 def notify_group(db, project, group):
     validators = db.execute(
-        "SELECT * FROM validators WHERE project_id=? AND grp=? ORDER BY id",
-        (project["id"], group)).fetchall()
+        "SELECT * FROM validators WHERE project_id=? AND grp=? AND"
+        " email<>'' ORDER BY id", (project["id"], group)).fetchall()
     base_url = request.url_root.rstrip("/")
+    now = datetime.now().isoformat(timespec="seconds")
     for v in validators:
         if v["status"] != "en_attente":
             continue
@@ -121,11 +151,27 @@ def notify_group(db, project, group):
         record_email(db, project["id"], v["email"],
                      "Vous avez un projet AVA à valider", body, error)
         if error:
-            flash(f"Impossible d'envoyer le mail à {v['email']} : {error}",
-                  "warning")
+            flash(f"Mail non délivré à {v['email']} : {error}", "warning")
         db.execute(
-            "UPDATE validators SET status='mail_envoye' WHERE id=?",
-            (v["id"],))
+            "UPDATE validators SET status='mail_envoye', sent_at=? WHERE id=?",
+            (now, v["id"]))
+
+
+def parse_gain(value):
+    if not value:
+        return 0.0
+    cleaned = re.sub(r"[^\d.,-]", "", str(value)).replace(" ", "")
+    cleaned = cleaned.replace(",", ".")
+    try:
+        return float(cleaned)
+    except ValueError:
+        return 0.0
+
+
+def participants(db, project_id, group):
+    return [v for v in db.execute(
+        "SELECT * FROM validators WHERE project_id=? AND grp=? ORDER BY id",
+        (project_id, group)).fetchall() if v["email"]]
 
 
 @app.route("/")
@@ -145,25 +191,23 @@ def new_project():
         errors = []
         if not form.get("name", "").strip():
             errors.append("Le nom du projet est obligatoire.")
-        if not form.get("creator_email", "").strip():
-            errors.append("L'adresse mail du créateur est obligatoire.")
-        validator_rows = []
+        rows = []
         for group, roles in (("interne_agro", INTERNAL_AGRO_ROLES),
                              ("itmai", ITMAI_ROLES)):
             for role in roles:
                 email = form.get(f"{group}__{role}__email", "").strip()
-                if not email:
-                    errors.append(
-                        f"Adresse mail manquante pour {role} ({'Agro' if group == 'interne_agro' else 'ITMAI'}).")
-                validator_rows.append((group, role,
-                                       form.get(f"{group}__{role}__first_name", "").strip(),
-                                       form.get(f"{group}__{role}__last_name", "").strip(),
-                                       email))
+                first = form.get(f"{group}__{role}__first_name", "").strip()
+                last = form.get(f"{group}__{role}__last_name", "").strip()
+                if first or last or email:
+                    rows.append((group, role, first, last, email))
+        if not any(r[0] == "interne_agro" and r[4] for r in rows):
+            errors.append("Indiquez au moins un valideur interne Agro "
+                          "(avec son adresse mail).")
         if errors:
             for e in errors:
                 flash(e, "danger")
             return render_template("new_project.html", form=request.form,
-                                   internal_roles=INTERNAL_AGRO_ROLES,
+                                   ups=UPS, internal_roles=INTERNAL_AGRO_ROLES,
                                    itmai_roles=ITMAI_ROLES), 400
 
         with get_db() as db:
@@ -181,34 +225,73 @@ def new_project():
                  form.get("total_gain", "").strip(),
                  datetime.now().isoformat(timespec="seconds")))
             project_id = cur.lastrowid
-            for group, role, first, last, email in validator_rows:
+            for group, role, first, last, email in rows:
                 db.execute(
                     "INSERT INTO validators (project_id, grp, role, first_name,"
                     " last_name, email, token, status) VALUES (?,?,?,?,?,?,?,"
                     "'en_attente')",
                     (project_id, group, role, first, last, email,
                      secrets.token_urlsafe(24)))
+            ids = [i for i in re.split(r"[^\d]+",
+                                       form.get("image_ids", "")) if i]
+            for i in ids:
+                db.execute("UPDATE images SET project_id=? WHERE id=?",
+                           (project_id, i))
             project = db.execute("SELECT * FROM projects WHERE id=?",
                                  (project_id,)).fetchone()
             notify_group(db, project, "interne_agro")
         flash("La fiche projet a été validée. Un mail de validation a été "
-              "envoyé aux trois valideurs internes Agro.", "success")
+              "envoyé aux valideurs internes Agro.", "success")
         return redirect(url_for("dashboard"))
 
-    return render_template("new_project.html", form={},
-                           internal_roles=INTERNAL_AGRO_ROLES,
+    today = datetime.now().strftime("%Y-%m-%d")
+    return render_template("new_project.html", form={"date": today},
+                           ups=UPS, internal_roles=INTERNAL_AGRO_ROLES,
                            itmai_roles=ITMAI_ROLES)
+
+
+@app.route("/api/upload-image", methods=["POST"])
+def upload_image():
+    data = request.get_json(silent=True) or {}
+    src = data.get("data", "")
+    m = re.match(r"data:(image/[\w.+-]+);base64,(.+)", src, re.S)
+    if not m:
+        return {"error": "image invalide"}, 400
+    import base64
+    try:
+        blob = base64.b64decode(m.group(2))
+    except Exception:
+        return {"error": "image illisible"}, 400
+    if len(blob) > 8 * 1024 * 1024:
+        return {"error": "image trop volumineuse (max 8 Mo)"}, 400
+    db = get_db()
+    with db:
+        cur = db.execute(
+            "INSERT INTO images (project_id, mime, data, created_at)"
+            " VALUES (NULL, ?, ?, ?)",
+            (m.group(1), blob,
+             datetime.now().isoformat(timespec="seconds")))
+    return {"id": cur.lastrowid}
+
+
+@app.route("/images/<int:image_id>")
+def image_file(image_id):
+    db = get_db()
+    img = db.execute("SELECT * FROM images WHERE id=?", (image_id,)).fetchone()
+    if img is None:
+        return "", 404
+    from io import BytesIO
+    return send_file(BytesIO(img["data"]), mimetype=img["mime"])
 
 
 @app.route("/valider/<token>", methods=["GET", "POST"])
 def validate(token):
     db = get_db()
-    v = db.execute(
-        "SELECT v.*, p.* FROM validators v JOIN projects p ON p.id=v.project_id"
-        " WHERE v.token=?", (token,)).fetchone()
+    v = db.execute("SELECT * FROM validators WHERE token=?",
+                   (token,)).fetchone()
     if v is None:
-        return render_template("validate.html", error="Lien de validation "
-                               "invalide."), 404
+        return render_template("validate.html",
+                               error="Lien de validation invalide."), 404
 
     if request.method == "POST":
         choice = request.form.get("choice")
@@ -229,44 +312,32 @@ def validate(token):
             else:
                 pending = db.execute(
                     "SELECT COUNT(*) c FROM validators WHERE project_id=? AND"
-                    " grp='interne_agro' AND status<>'valide'",
+                    " grp='interne_agro' AND email<>'' AND status<>'valide'",
                     (project["id"],)).fetchone()["c"]
-                external_pending = db.execute(
-                    "SELECT COUNT(*) c FROM validators WHERE project_id=? AND"
-                    " grp='itmai' AND status NOT IN ('valide')",
-                    (project["id"],)).fetchone()["c"]
+                external = [x for x in db.execute(
+                    "SELECT * FROM validators WHERE project_id=? AND grp='itmai'",
+                    (project["id"],)).fetchall() if x["email"]]
+                external_validated = sum(1 for x in external
+                                         if x["status"] == "valide")
                 if pending == 0 and project["status"] == "phase_interne":
-                    if external_pending > 0:
-                        db.execute("UPDATE projects SET status='phase_externe'"
-                                   " WHERE id=?", (project["id"],))
+                    if external and external_validated < len(external):
+                        db.execute(
+                            "UPDATE projects SET status='phase_externe'"
+                            " WHERE id=?", (project["id"],))
                         notify_group(db, project, "itmai")
-                        flash("Merci ! Tous les valideurs internes Agro ont "
-                              "validé. Les valideurs ITMAI viennent d'être "
-                              "notifiés.", "success")
+                        flash("Merci ! Les valideurs internes ont validé. "
+                              "Les valideurs ITMAI viennent d'être notifiés.",
+                              "success")
                     else:
                         finalize(db, project)
-                elif pending == 0 and project["status"] == "phase_externe":
+                elif (pending == 0 and project["status"] == "phase_externe"
+                      and external
+                      and external_validated == len(external)):
                     finalize(db, project)
+                elif choice == "non":
+                    flash("Votre refus a été enregistré.", "warning")
                 else:
-                    if v["grp"] == "itmai":
-                        remaining = db.execute(
-                            "SELECT COUNT(*) c FROM validators WHERE "
-                            "project_id=? AND grp='itmai' AND status<>'valide'",
-                            (project["id"],)).fetchone()["c"]
-                        flash("Merci pour votre validation." +
-                              (f" Il reste {remaining} valideur(s) ITMAI."
-                               if remaining else ""), "success")
-                    else:
-                        remaining = db.execute(
-                            "SELECT COUNT(*) c FROM validators WHERE "
-                            "project_id=? AND grp='interne_agro' AND "
-                            "status<>'valide'",
-                            (project["id"],)).fetchone()["c"]
-                        flash("Merci pour votre validation." +
-                              (f" Il reste {remaining} valideur(s) interne(s)"
-                               " Agro." if remaining else ""), "success")
-                    if choice == "non":
-                        flash("Votre refus a été enregistré.", "warning")
+                    flash("Merci pour votre validation.", "success")
         return redirect(url_for("validate", token=token))
 
     project = db.execute(
@@ -277,10 +348,13 @@ def validate(token):
             WHERE v.token = ?""",
         (token,)).fetchone()
     if project is None:
-        return render_template("validate.html", error="Lien de validation "
-                               "invalide."), 404
-    return render_template("validate.html", project=project,
-                           validator=v,
+        return render_template("validate.html",
+                               error="Lien de validation invalide."), 404
+    images = db.execute(
+        "SELECT id FROM images WHERE project_id=? ORDER BY id",
+        (v["project_id"],)).fetchall()
+    return render_template("validate.html", project=project, validator=v,
+                           images=images,
                            already=v["status"] in ("valide", "refuse"))
 
 
@@ -298,38 +372,111 @@ def finalize(db, project):
                  "Votre projet AVA est validé", body, error)
 
 
+def _projects_with_validators(db, archived):
+    projects = db.execute(
+        "SELECT * FROM projects WHERE archived=? ORDER BY created_at DESC",
+        (archived,)).fetchall()
+    grouped = {}
+    for v in db.execute("SELECT * FROM validators ORDER BY id").fetchall():
+        if v["email"] == "" and v["first_name"] == "" and v["last_name"] == "":
+            continue
+        grouped.setdefault(v["project_id"], []).append(v)
+    return projects, grouped
+
+
 @app.route("/tableau-de-pilotage")
 def dashboard():
     db = get_db()
-    projects = db.execute(
-        """SELECT p.*, GROUP_CONCAT(v.grp) AS grp_list
-             FROM projects p LEFT JOIN validators v ON v.project_id = p.id
-            WHERE p.archived = 0
-            GROUP BY p.id ORDER BY p.created_at DESC""").fetchall()
-    all_validators = db.execute(
-        "SELECT * FROM validators ORDER BY id").fetchall()
-    grouped = {}
-    for v in all_validators:
-        grouped.setdefault(v["project_id"], []).append(v)
+    projects, grouped = _projects_with_validators(db, 0)
     return render_template("dashboard.html", projects=projects,
                            validators_by_project=grouped,
-                           status_label=validator_status_label)
+                           status_label=validator_status_label,
+                           project_status_label=project_status_label)
 
 
 @app.route("/archives")
 def archives():
     db = get_db()
-    projects = db.execute(
-        "SELECT * FROM projects WHERE archived = 1 ORDER BY created_at DESC"
-    ).fetchall()
-    all_validators = db.execute(
-        "SELECT * FROM validators ORDER BY id").fetchall()
-    grouped = {}
-    for v in all_validators:
-        grouped.setdefault(v["project_id"], []).append(v)
+    projects, grouped = _projects_with_validators(db, 1)
     return render_template("archives.html", projects=projects,
                            validators_by_project=grouped,
-                           status_label=validator_status_label)
+                           status_label=validator_status_label,
+                           project_status_label=project_status_label)
+
+
+@app.route("/projet/<int:project_id>/modifier", methods=["GET", "POST"])
+def edit_project(project_id):
+    db = get_db()
+    project = db.execute("SELECT * FROM projects WHERE id=?",
+                         (project_id,)).fetchone()
+    if project is None:
+        flash("Projet introuvable.", "danger")
+        return redirect(url_for("dashboard"))
+    if request.method == "POST":
+        form = request.form
+        with db:
+            db.execute(
+                """UPDATE projects SET name=?, date=?, up=?, creator_name=?,
+                       creator_email=?, description=?, launch_delay_months=?,
+                       total_gain=?, status=?, archived=?
+                    WHERE id=?""",
+                (form.get("name", "").strip(),
+                 form.get("date", "").strip(),
+                 form.get("up", "").strip(),
+                 form.get("creator_name", "").strip(),
+                 form.get("creator_email", "").strip(),
+                 form.get("description", "").strip(),
+                 form.get("launch_delay_months", "0") or 0,
+                 form.get("total_gain", "").strip(),
+                 form.get("status", "phase_interne"),
+                 1 if form.get("archived") == "on" else 0,
+                 project_id))
+            for v in db.execute(
+                    "SELECT * FROM validators WHERE project_id=?",
+                    (project_id,)).fetchall():
+                p = f"v{v['id']}"
+                db.execute(
+                    """UPDATE validators SET first_name=?, last_name=?,
+                           email=?, status=?, sent_at=?, answered_at=?
+                        WHERE id=?""",
+                    (form.get(f"{p}__first_name", "").strip(),
+                     form.get(f"{p}__last_name", "").strip(),
+                     form.get(f"{p}__email", "").strip(),
+                     form.get(f"{p}__status", v["status"]),
+                     form.get(f"{p}__sent_at", "").strip() or None,
+                     form.get(f"{p}__answered_at", "").strip() or None,
+                     v["id"]))
+        flash("Modifications enregistrées.", "success")
+        return redirect(url_for("dashboard"))
+
+    _, grouped = _projects_with_validators(db, 0)
+    validators = [v for v in db.execute(
+        "SELECT * FROM validators WHERE project_id=? ORDER BY id",
+        (project_id,)).fetchall()
+        if v["email"] or v["first_name"] or v["last_name"]]
+    images = db.execute(
+        "SELECT id FROM images WHERE project_id=? ORDER BY id",
+        (project_id,)).fetchall()
+    return render_template("edit_project.html", project=project, ups=UPS,
+                           validators=validators,
+                           internal_roles=INTERNAL_AGRO_ROLES,
+                           itmai_roles=ITMAI_ROLES,
+                           validator_statuses=VALIDATOR_STATUSES,
+                           project_statuses=PROJECT_STATUSES,
+                           status_label=validator_status_label,
+                           images=images)
+
+
+@app.route("/rapport")
+def rapport():
+    mois = request.args.get("mois", type=int)
+    if mois not in (12, 24):
+        return render_template("rapport_selection.html")
+    from rapport_pdf import build_pdf
+    pdf = build_pdf(get_db(), mois)
+    return send_file(pdf, mimetype="application/pdf",
+                     download_name=f"dashboard_AVAA_{mois}mois.pdf",
+                     as_attachment=True)
 
 
 @app.post("/projet/<int:project_id>/archiver")
@@ -352,6 +499,7 @@ def unarchive_project(project_id):
 def delete_project(project_id):
     from_url = request.form.get("from", "dashboard")
     with get_db() as db:
+        db.execute("DELETE FROM images WHERE project_id=?", (project_id,))
         db.execute("DELETE FROM validators WHERE project_id=?", (project_id,))
         db.execute("DELETE FROM emails_log WHERE project_id=?", (project_id,))
         db.execute("DELETE FROM projects WHERE id=?", (project_id,))

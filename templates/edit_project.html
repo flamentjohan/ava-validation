@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% block title %}Modifier le projet — AVA{% endblock %}
+{% block content %}
+<h1>Modifier le projet — {{ project['name'] }}</h1>
+<p><a class="btn" href="{{ url_for('dashboard') }}">← Tableau de pilotage</a></p>
+<form method="post" class="fiche">
+  <fieldset>
+    <legend>Informations du projet</legend>
+    <div class="grid">
+      <label>Nom du projet
+        <input type="text" name="name" value="{{ project['name'] }}" required>
+      </label>
+      <label>Date
+        <input type="date" name="date" value="{{ project['date'] }}">
+      </label>
+      <label>UP concernée
+        <select name="up">
+          {% for up in ups %}
+          <option value="{{ up }}" {% if project['up'] == up %}selected{% endif %}>{{ up }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>Nom du responsable projet
+        <input type="text" name="creator_name" value="{{ project['creator_name'] }}">
+      </label>
+      <label>Adresse mail du responsable projet
+        <input type="email" name="creator_email" value="{{ project['creator_email'] }}">
+      </label>
+      <label>Temps de développement nécessaire (en mois)
+        <input type="number" name="launch_delay_months" min="0"
+               value="{{ project['launch_delay_months'] }}">
+      </label>
+      <label>Gain total estimé (€)
+        <input type="text" name="total_gain" value="{{ project['total_gain'] }}">
+      </label>
+      <label>Statut du workflow
+        <select name="status">
+          {% for s in project_statuses %}
+          <option value="{{ s }}" {% if project['status'] == s %}selected{% endif %}>
+            {{ {'phase_interne': 'Validation interne en cours',
+                'phase_externe': 'Validation ITMAI en cours',
+                'valide': 'Projet validé',
+                'refuse': 'Projet refusé'}.get(s, s) }}
+          </option>
+          {% endfor %}
+        </select>
+      </label>
+    </div>
+    <label class="full">Descriptif détaillé
+      <textarea name="description" rows="9">{{ project['description'] }}</textarea>
+    </label>
+    <label class="checkbox-line">
+      <input type="checkbox" name="archived" {% if project['archived'] %}checked{% endif %}>
+      Projet archivé
+    </label>
+    {% if images %}
+    <div class="pastezone">
+      <strong>Images du projet</strong>
+      <div class="thumbs">
+        {% for im in images %}
+        <span class="thumb"><img src="{{ url_for('image_file', image_id=im['id']) }}" alt="Image"></span>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+  </fieldset>
+
+  <fieldset>
+    <legend>Valideurs et états de validation</legend>
+    <p class="hint">Vous pouvez modifier tous les champs, y compris les statuts et les dates (format : 2026-11-25 14:30:00).</p>
+    {% set groups = [('interne_agro', 'Valideurs internes AGRO', internal_roles),
+                     ('itmai', 'Valideurs externes ITMAI', itmai_roles)] %}
+    {% for grp, glabel, roles in groups %}
+    <h3 class="gtitle g-{{ grp }}">{{ glabel }}</h3>
+    <table class="validators">
+      <thead>
+        <tr><th>Rôle</th><th>Prénom</th><th>Nom</th><th>Mail</th>
+            <th>Reçu le</th><th>Validé le</th><th>Statut</th></tr>
+      </thead>
+      <tbody>
+      {% for v in validators if v['grp'] == grp %}
+        <tr>
+          <th>{{ v['role'] }}</th>
+          <td><input type="text" name="v{{ v['id'] }}__first_name" value="{{ v['first_name'] }}"></td>
+          <td><input type="text" name="v{{ v['id'] }}__last_name" value="{{ v['last_name'] }}"></td>
+          <td><input type="email" name="v{{ v['id'] }}__email" value="{{ v['email'] }}" style="min-width:180px"></td>
+          <td><input type="text" name="v{{ v['id'] }}__sent_at" value="{{ v['sent_at'] or '' }}" placeholder="2026-11-25 14:30:00"></td>
+          <td><input type="text" name="v{{ v['id'] }}__answered_at" value="{{ v['answered_at'] or '' }}" placeholder="2026-11-25 14:30:00"></td>
+          <td>
+            <select name="v{{ v['id'] }}__status">
+              {% for s in validator_statuses %}
+              <option value="{{ s }}" {% if v['status'] == s %}selected{% endif %}>{{ status_label(s) }}</option>
+              {% endfor %}
+            </select>
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% endfor %}
+  </fieldset>
+
+  <div class="actions">
+    <button type="submit" class="btn btn-primary">Enregistrer les modifications</button>
+  </div>
+</form>
+{% endblock %}

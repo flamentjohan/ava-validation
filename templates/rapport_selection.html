@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Mode reporting — AVA{% endblock %}
+{% block content %}
+<h1>Mode reporting</h1>
+<div class="validate-page">
+  <section class="panel question" style="margin-top:2rem; padding:2.5rem;">
+    <h2>Dashboard AVA</h2>
+    <p>Choisissez la période du reporting (mois glissants) pour générer le PDF :</p>
+    <div class="choice">
+      <a class="btn btn-primary" href="{{ url_for('rapport', mois=12) }}" style="padding:.9rem 2.2rem;">12 mois glissants</a>
+      <a class="btn btn-primary" href="{{ url_for('rapport', mois=24) }}" style="padding:.9rem 2.2rem;">24 mois glissants</a>
+    </div>
+    <p style="margin-top:1.5rem;"><a href="{{ url_for('dashboard') }}">← Retour au tableau de pilotage</a></p>
+  </section>
+</div>
+{% endblock %}

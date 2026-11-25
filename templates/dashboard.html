@@ -2,6 +2,9 @@
 {% block title %}Tableau de pilotage — AVA{% endblock %}
 {% block content %}
 <h1>Tableau de pilotage</h1>
+<div class="toolbar">
+  <a class="btn btn-primary" href="{{ url_for('rapport') }}" onclick="showReportModal(event)">📄 Mode reporting</a>
+</div>
 <p class="legend">
   <span class="dot dot-valide">Validé</span>
   <span class="dot dot-mail_envoye">En attente de validation</span>
@@ -18,46 +21,47 @@
 <div class="project-block">
   <div class="project-head">
     <h2>{{ project['name'] }}</h2>
-    <span class="status-badge status-{{ project['status'] }}">
-      {% if project['status'] == 'phase_interne' %}Validation interne en cours
-      {% elif project['status'] == 'phase_externe' %}Validation ITMAI en cours
-      {% elif project['status'] == 'valide' %}Projet validé
-      {% elif project['status'] == 'refuse' %}Projet refusé
-      {% else %}{{ project['status'] }}
-      {% endif %}
-    </span>
+    <span class="status-badge status-{{ project['status'] }}">{{ project_status_label(project['status']) }}</span>
   </div>
   <table class="dash">
     <thead>
       <tr>
         <th rowspan="2">UP</th>
         <th rowspan="2">Date</th>
-        <th rowspan="2">Créateur</th>
-        <th rowspan="2">Group / Rôle</th>
-        <th colspan="2">Valideur</th>
-        <th rowspan="2">Statut</th>
+        <th rowspan="2">Responsable projet</th>
+        <th rowspan="2">Gain (€)</th>
+        <th colspan="6">Valideurs</th>
         <th rowspan="2" class="actions-col">Actions</th>
       </tr>
-      <tr><th>Nom</th><th>Mail</th></tr>
+      <tr>
+        <th>Rôle</th>
+        <th>Nom</th>
+        <th>Mail</th>
+        <th>Reçu le</th>
+        <th>Validé le</th>
+        <th>Statut</th>
+      </tr>
     </thead>
     <tbody>
-    {% for v in vs %}
-      <tr>
+      {% if vs|length == 0 %}
+      <tr><td>{{ project['up'] }}</td><td>{{ project['date'] }}</td>
+          <td>{{ project['creator_name'] }}</td><td>{{ project['total_gain'] }}</td>
+          <td colspan="7">Aucun valideur renseigné</td></tr>
+      {% endif %}
+      {% set rowspan_total = vs|length + (1 if interna|length else 0) + (1 if externa|length else 0) %}
+      {% for v in vs %}
+      {% set new_group = loop.first or vs[loop.index0 - 1]['grp'] != v['grp'] %}
+      {% if new_group %}
+      <tr class="group-row g-{{ v['grp'] }}">
+        <td rowspan="{{ rowspan_total }}">{{ project['up'] }}</td>
+        <td rowspan="{{ rowspan_total }}">{{ project['date'] }}</td>
+        <td rowspan="{{ rowspan_total }}">{{ project['creator_name'] }}<br><small>{{ project['creator_email'] }}</small></td>
+        <td rowspan="{{ rowspan_total }}">{{ project['total_gain'] }}</td>
+        <td colspan="6">{{ 'Valideurs internes AGRO' if v['grp'] == 'interne_agro' else 'Valideurs externes ITMAI' }}</td>
         {% if loop.first %}
-        <td rowspan="{{ vs|length }}">{{ project['up'] }}</td>
-        <td rowspan="{{ vs|length }}">{{ project['date'] }}</td>
-        <td rowspan="{{ vs|length }}">{{ project['creator_name'] }}<br><small>{{ project['creator_email'] }}</small></td>
-        {% endif %}
-        <td>{{ ('Agro' if v['grp'] == 'interne_agro' else 'ITMAI') }} — {{ v['role'] }}</td>
-        <td>{{ v['first_name'] }} {{ v['last_name'] }}</td>
-        <td><small>{{ v['email'] }}</small></td>
-        <td>
-          <span class="dot dot-{{ v['status'] }}">{{ status_label(v['status']) }}</span>
-          {% if v['answered_at'] %}<small>le {{ v['answered_at'][:16] }}</small>{% endif %}
-        </td>
-        {% if loop.first %}
-        <td rowspan="{{ vs|length }}" class="actions-col">
+        <td rowspan="{{ rowspan_total }}" class="actions-col">
           <div class="block-actions">
+            <a class="btn" href="{{ url_for('edit_project', project_id=project['id']) }}">Modifier</a>
             <a class="btn" href="{{ url_for('project_emails', project_id=project['id']) }}">Mails</a>
             <form method="post" action="{{ url_for('archive_project', project_id=project['id']) }}"
                   onsubmit="return confirm('Archiver ce projet ?');">
@@ -71,9 +75,36 @@
         </td>
         {% endif %}
       </tr>
-    {% endfor %}
+      {% endif %}
+      <tr class="{{ 'rinter' if v['grp'] == 'interne_agro' else 'rexter' }}">
+        <td>{{ v['role'] }}</td>
+        <td>{{ v['first_name'] }} {{ v['last_name'] }}</td>
+        <td><small>{{ v['email'] }}</small></td>
+        <td><small>{{ (v['sent_at'] or '—')[:16] }}</small></td>
+        <td><small>{{ (v['answered_at'] or '—')[:16] }}</small></td>
+        <td><span class="dot dot-{{ v['status'] }}">{{ status_label(v['status']) }}</span></td>
+      </tr>
+      {% endfor %}
     </tbody>
   </table>
 </div>
 {% endfor %}
+
+<div class="modal-backdrop" id="report-modal" hidden>
+  <div class="modal">
+    <h3>Dashboard AVA</h3>
+    <p>Choisissez la période du reporting (mois glissants) :</p>
+    <div class="modal-actions">
+      <a class="btn btn-primary" href="{{ url_for('rapport', mois=12) }}">12 mois</a>
+      <a class="btn btn-primary" href="{{ url_for('rapport', mois=24) }}">24 mois</a>
+      <button type="button" class="btn" onclick="document.getElementById('report-modal').hidden = true;">Annuler</button>
+    </div>
+  </div>
+</div>
+<script>
+function showReportModal(e) {
+  e.preventDefault();
+  document.getElementById("report-modal").hidden = false;
+}
+</script>
 {% endblock %}

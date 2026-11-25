@@ -2,7 +2,7 @@
 {% block title %}Nouveau projet — AVA{% endblock %}
 {% block content %}
 <h1>Fiche projet</h1>
-<form method="post" class="fiche">
+<form method="post" class="fiche" id="fiche-form">
   <fieldset>
     <legend>1. Informations du projet</legend>
     <div class="grid">
@@ -13,19 +13,23 @@
       <label>Date
         <input type="date" name="date" value="{{ form.get('date', '') }}">
       </label>
-      <label>Nom du créateur
+      <label>Nom du responsable projet
         <input type="text" name="creator_name" required
                value="{{ form.get('creator_name', '') }}">
       </label>
-      <label>Adresse mail du créateur
+      <label>Adresse mail du responsable projet
         <input type="email" name="creator_email" required
                value="{{ form.get('creator_email', '') }}">
       </label>
       <label>UP concernée (l'usine)
-        <input type="text" name="up" required
-               value="{{ form.get('up', '') }}">
+        <select name="up" required>
+          <option value="" {% if not form.get('up') %}selected{% endif %} disabled>— Choisir une UP —</option>
+          {% for up in ups %}
+          <option value="{{ up }}" {% if form.get('up') == up %}selected{% endif %}>{{ up }}</option>
+          {% endfor %}
+        </select>
       </label>
-      <label>Délai de lancement cible (en mois, à partir de la validation définitive)
+      <label>Temps de développement nécessaire à partir de la validation (en mois)
         <input type="number" name="launch_delay_months" min="0" required
                value="{{ form.get('launch_delay_months', '') }}">
       </label>
@@ -36,14 +40,22 @@
       </label>
     </div>
     <label class="full">Descriptif détaillé
-      <textarea name="description" rows="18" required
-                placeholder="Décrivez le projet en détail (plus de 800 mots si nécessaire)…">{{ form.get('description', '') }}</textarea>
+      <textarea name="description" rows="9" required
+                placeholder="Décrivez le projet en détail…">{{ form.get('description', '') }}</textarea>
       <small>{{ (form.get('description', '') ~ ' ')|wordcount }} mots saisis</small>
     </label>
+    <div class="pastezone" id="pastezone">
+      <strong>Images du projet</strong>
+      <p>Collez ici vos images avec <strong>Ctrl + V</strong> (capture d'écran, schéma…).</p>
+      <div class="thumbs" id="thumbs"></div>
+      <input type="hidden" name="image_ids" id="image_ids"
+             value="{{ form.get('image_ids', '') }}">
+    </div>
   </fieldset>
 
   <fieldset>
     <legend>2. Valideurs internes Agro</legend>
+    <p class="hint">Au moins un valideur interne est nécessaire ; les lignes laissées vides sont ignorées et ne bloquent pas la validation.</p>
     <table class="validators">
       <thead>
         <tr><th>Rôle</th><th>Prénom</th><th>Nom</th><th>Adresse mail</th></tr>
@@ -56,7 +68,7 @@
                      value="{{ form.get('interne_agro__' ~ role ~ '__first_name', '') }}"></td>
           <td><input type="text" name="interne_agro__{{ role }}__last_name"
                      value="{{ form.get('interne_agro__' ~ role ~ '__last_name', '') }}"></td>
-          <td><input type="email" name="interne_agro__{{ role }}__email" required
+          <td><input type="email" name="interne_agro__{{ role }}__email"
                      value="{{ form.get('interne_agro__' ~ role ~ '__email', '') }}"></td>
         </tr>
       {% endfor %}
@@ -66,6 +78,7 @@
 
   <fieldset>
     <legend>3. Valideurs ITMAI</legend>
+    <p class="hint">Ils ne seront notifiés qu'après validation de tous les valideurs internes renseignés.</p>
     <table class="validators">
       <thead>
         <tr><th>Rôle</th><th>Prénom</th><th>Nom</th><th>Adresse mail</th></tr>
@@ -78,7 +91,7 @@
                      value="{{ form.get('itmai__' ~ role ~ '__first_name', '') }}"></td>
           <td><input type="text" name="itmai__{{ role }}__last_name"
                      value="{{ form.get('itmai__' ~ role ~ '__last_name', '') }}"></td>
-          <td><input type="email" name="itmai__{{ role }}__email" required
+          <td><input type="email" name="itmai__{{ role }}__email"
                      value="{{ form.get('itmai__' ~ role ~ '__email', '') }}"></td>
         </tr>
       {% endfor %}
@@ -90,4 +103,92 @@
     <button type="submit" class="btn btn-primary">Valider la fiche et lancer le workflow</button>
   </div>
 </form>
+
+<div class="modal-backdrop" id="confirm-modal" hidden>
+  <div class="modal">
+    <h3>Confirmer la validation</h3>
+    <p>Avez-vous bien complété la fiche ?<br>
+       La validation va envoyer un mail aux personnes inscrites dans le workflow.</p>
+    <div class="modal-actions">
+      <button type="button" class="btn btn-primary" id="confirm-ok">Confirmer la validation</button>
+      <button type="button" class="btn" id="confirm-cancel">Retour sur la fiche projet</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  var form = document.getElementById("fiche-form");
+  var modal = document.getElementById("confirm-modal");
+  var idsField = document.getElementById("image_ids");
+  var thumbs = document.getElementById("thumbs");
+  var zone = document.getElementById("pastezone");
+
+  function renderThumb(id) {
+    var wrap = document.createElement("span");
+    wrap.className = "thumb";
+    var img = document.createElement("img");
+    img.src = "/images/" + id;
+    wrap.appendChild(img);
+    var btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "thumb-del";
+    btn.textContent = "×";
+    btn.onclick = function () {
+      wrap.remove();
+      var ids = idsField.value.split(",").filter(Boolean)
+        .filter(function (i) { return String(id) !== i.trim(); });
+      idsField.value = ids.join(",");
+    };
+    wrap.appendChild(btn);
+    thumbs.appendChild(wrap);
+  }
+
+  function uploadItem(file) {
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function () {
+      fetch("{{ url_for('upload_image') }}", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ data: reader.result })
+      }).then(function (r) { return r.json(); }).then(function (res) {
+        if (res.id) {
+          renderThumb(res.id);
+          var ids = idsField.value.split(",").filter(Boolean);
+          ids.push(res.id);
+          idsField.value = ids.join(",");
+        }
+      });
+    };
+    reader.readAsDataURL(file);
+  }
+
+  form.addEventListener("paste", function (e) {
+    var items = (e.clipboardData || {}).items || [];
+    for (var i = 0; i < items.length; i++) {
+      if (items[i].type.indexOf("image") === 0) {
+        e.preventDefault();
+        uploadItem(items[i].getAsFile());
+        return;
+      }
+    }
+  });
+  zone.addEventListener("click", function () {
+    form.querySelector("textarea").focus();
+  });
+
+  form.addEventListener("submit", function (e) {
+    e.preventDefault();
+    modal.hidden = false;
+  });
+  document.getElementById("confirm-ok").addEventListener("click", function () {
+    modal.hidden = true;
+    form.submit();
+  });
+  document.getElementById("confirm-cancel").addEventListener("click", function () {
+    modal.hidden = true;
+  });
+})();
+</script>
 {% endblock %}

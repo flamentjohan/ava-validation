@@ -6,7 +6,7 @@ Récapitulatif du projet :
 
 - Nom du projet : {{ project.name }}
 - Date : {{ project.date }}
-- Créateur : {{ project.creator_name }} ({{ project.creator_email }})
+- Responsable projet : {{ project.creator_name }} ({{ project.creator_email }})
 - UP concernée : {{ project.up }}
 - Délai de lancement cible : {{ project.launch_delay_months }} mois après validation définitive
 - Gain total estimé : {{ project.total_gain }} €

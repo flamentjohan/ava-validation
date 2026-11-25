@@ -12,19 +12,26 @@
     <h2>{{ project['name'] }}</h2>
     <dl class="info-grid">
       <dt>Date</dt><dd>{{ project['proj_date'] }}</dd>
-      <dt>Créateur</dt><dd>{{ project['creator_name'] }} — {{ project['creator_email'] }}</dd>
+      <dt>Responsable projet</dt><dd>{{ project['creator_name'] }} — {{ project['creator_email'] }}</dd>
       <dt>UP concernée</dt><dd>{{ project['up'] }}</dd>
-      <dt>Délai de lancement cible</dt><dd>{{ project['launch_delay_months'] }} mois après validation définitive</dd>
+      <dt>Temps de développement nécessaire</dt><dd>{{ project['launch_delay_months'] }} mois à partir de la validation</dd>
       <dt>Gain total estimé</dt><dd>{{ project['total_gain'] }} €</dd>
-      <dt>Statut du workflow</dt>
-      <dd>{% if project['status'] == 'phase_interne' %}Validation interne en cours
-          {% elif project['status'] == 'phase_externe' %}Validation ITMAI en cours
-          {% elif project['status'] == 'valide' %}Projet validé
-          {% elif project['status'] == 'refuse' %}Projet refusé
-          {% else %}{{ project['status'] }}{% endif %}</dd>
+      <dt>Statut du workflow</dt><dd>{{ {'phase_interne': 'Validation interne en cours',
+          'phase_externe': 'Validation ITMAI en cours', 'valide': 'Projet validé',
+          'refuse': 'Projet refusé'}.get(project['status'], project['status']) }}</dd>
     </dl>
     <h3>Descriptif détaillé</h3>
     <p class="description">{{ project['description'] }}</p>
+    {% if images %}
+    <h3>Images du projet</h3>
+    <div class="thumbs">
+      {% for im in images %}
+      <a href="{{ url_for('image_file', image_id=im['id']) }}" target="_blank" class="thumb">
+        <img src="{{ url_for('image_file', image_id=im['id']) }}" alt="Image du projet">
+      </a>
+      {% endfor %}
+    </div>
+    {% endif %}
   </section>
 
   {% if already %}
