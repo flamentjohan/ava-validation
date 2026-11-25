@@ -45,7 +45,24 @@ pilotage, ce qui permet de tester le workflow de bout en bout.
 
 ## Lancer l'application
 
-### Sous Windows (le plus simple)
+### Sous Windows, sans installer Python (PC d'entreprise, sans droits admin)
+
+Le dépôt contient un **Python portable complet** dans le dossier `portable/`
+(rien à installer, rien à configurer, aucun droit administrateur requis) :
+
+1. Téléchargez le ZIP du dépôt : bouton vert **Code → Download ZIP** ;
+2. Faites un clic droit sur le ZIP → **Extraire tout** (à un emplacement où
+   vous avez le droit d'écrire, ex. `Documents\ava-validation`) ;
+3. Double-cliquez sur **`demarrer_portable.bat`**.
+
+Le navigateur s'ouvre automatiquement sur http://127.0.0.1:5000
+La base de données `ava.db` est créée dans le même dossier au premier
+lancement. Pour arrêter : fermez la fenêtre noire.
+
+> Si Windows affiche un avertissement SmartScreen, cliquez sur
+> « Informations complémentaires → Exécuter quand même ».
+
+### Sous Windows avec Python installé
 
 Double-cliquez sur **`demarrer.bat`** : il vérifie Python, installe les
 composants au premier lancement, démarre l'application et ouvre automatiquement
