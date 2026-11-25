@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}Test — AVA{% endblock %}
+{% block content %}
+<div class="home">
+  <h1>✅ L'application AVA fonctionne</h1>
+  <p class="subtitle">Cette page de test confirme que le serveur répond bien sur
+     <strong>{{ url }}</strong>.</p>
+  <div class="home-cards">
+    <a class="home-card" href="{{ url_for('index') }}">
+      <span class="home-emoji">🏠</span>
+      <span class="home-title">Aller à la page d'accueil</span>
+      <span class="home-text">Nouveau projet / Tableau de pilotage</span>
+    </a>
+  </div>
+  <p class="subtitle">Si vous voyez cette page, le problème du navigateur qui
+     ne s'ouvre pas est uniquement un souci d'ouverture automatique :
+     utilisez simplement cette adresse manuellement dans Chrome ou Edge.</p>
+</div>
+{% endblock %}

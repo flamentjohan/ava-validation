@@ -133,6 +133,11 @@ def index():
     return render_template("index.html")
 
 
+@app.route("/test")
+def test_page():
+    return render_template("test.html", url=request.host_url.rstrip("/"))
+
+
 @app.route("/nouveau-projet", methods=["GET", "POST"])
 def new_project():
     if request.method == "POST":
