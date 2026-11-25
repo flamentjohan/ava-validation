@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}Accueil — AVA{% endblock %}
+{% block content %}
+<div class="home">
+  <h1>Bienvenue sur l'application AVA</h1>
+  <p class="subtitle">Que souhaitez-vous faire ?</p>
+  <div class="home-cards">
+    <a class="home-card" href="{{ url_for('new_project') }}">
+      <span class="home-emoji">📝</span>
+      <span class="home-title">Nouveau projet</span>
+      <span class="home-text">Compléter la fiche projet et lancer le workflow de validation.</span>
+    </a>
+    <a class="home-card" href="{{ url_for('dashboard') }}">
+      <span class="home-emoji">📊</span>
+      <span class="home-title">Tableau de pilotage</span>
+      <span class="home-text">Suivre l'état de validation de tous les projets.</span>
+    </a>
+  </div>
+  <p class="archives-link"><a href="{{ url_for('archives') }}">📁 Accéder aux projets archivés</a></p>
+</div>
+{% endblock %}

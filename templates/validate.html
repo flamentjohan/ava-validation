@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}Validation de projet — AVA{% endblock %}
+{% block content %}
+{% if error %}
+  <p class="flash flash-danger">{{ error }}</p>
+  <a class="btn" href="{{ url_for('index') }}">Retour à l'accueil</a>
+{% else %}
+<div class="validate-page">
+  <h1>Validation du projet</h1>
+
+  <section class="panel">
+    <h2>{{ project['name'] }}</h2>
+    <dl class="info-grid">
+      <dt>Date</dt><dd>{{ project['proj_date'] }}</dd>
+      <dt>Créateur</dt><dd>{{ project['creator_name'] }} — {{ project['creator_email'] }}</dd>
+      <dt>UP concernée</dt><dd>{{ project['up'] }}</dd>
+      <dt>Délai de lancement cible</dt><dd>{{ project['launch_delay_months'] }} mois après validation définitive</dd>
+      <dt>Gain total estimé</dt><dd>{{ project['total_gain'] }} €</dd>
+      <dt>Statut du workflow</dt>
+      <dd>{% if project['status'] == 'phase_interne' %}Validation interne en cours
+          {% elif project['status'] == 'phase_externe' %}Validation ITMAI en cours
+          {% elif project['status'] == 'valide' %}Projet validé
+          {% elif project['status'] == 'refuse' %}Projet refusé
+          {% else %}{{ project['status'] }}{% endif %}</dd>
+    </dl>
+    <h3>Descriptif détaillé</h3>
+    <p class="description">{{ project['description'] }}</p>
+  </section>
+
+  {% if already %}
+    <div class="panel notice">
+      <p>Votre réponse a déjà été enregistrée :
+        <strong>{{ 'Validé ✅' if validator['status'] == 'valide' else 'Refusé ❌' }}</strong>
+        {% if validator['answered_at'] %}le {{ validator['answered_at'] }}{% endif %}.</p>
+    </div>
+  {% else %}
+    <section class="panel question">
+      <h2>Validez-vous ce projet ?</h2>
+      <form method="post" class="choice">
+        <button type="submit" name="choice" value="oui" class="btn btn-oui">OUI</button>
+        <button type="submit" name="choice" value="non" class="btn btn-non">NON</button>
+      </form>
+    </section>
+  {% endif %}
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block title %}Nouveau projet — AVA{% endblock %}
+{% block content %}
+<h1>Fiche projet</h1>
+<form method="post" class="fiche">
+  <fieldset>
+    <legend>1. Informations du projet</legend>
+    <div class="grid">
+      <label>Nom du projet
+        <input type="text" name="name" required
+               value="{{ form.get('name', '') }}">
+      </label>
+      <label>Date
+        <input type="date" name="date" value="{{ form.get('date', '') }}">
+      </label>
+      <label>Nom du créateur
+        <input type="text" name="creator_name" required
+               value="{{ form.get('creator_name', '') }}">
+      </label>
+      <label>Adresse mail du créateur
+        <input type="email" name="creator_email" required
+               value="{{ form.get('creator_email', '') }}">
+      </label>
+      <label>UP concernée (l'usine)
+        <input type="text" name="up" required
+               value="{{ form.get('up', '') }}">
+      </label>
+      <label>Délai de lancement cible (en mois, à partir de la validation définitive)
+        <input type="number" name="launch_delay_months" min="0" required
+               value="{{ form.get('launch_delay_months', '') }}">
+      </label>
+      <label>Gain total estimé (€)
+        <input type="text" name="total_gain" inputmode="numeric" required
+               placeholder="Ex : 125 000"
+               value="{{ form.get('total_gain', '') }}">
+      </label>
+    </div>
+    <label class="full">Descriptif détaillé
+      <textarea name="description" rows="18" required
+                placeholder="Décrivez le projet en détail (plus de 800 mots si nécessaire)…">{{ form.get('description', '') }}</textarea>
+      <small>{{ (form.get('description', '') ~ ' ')|wordcount }} mots saisis</small>
+    </label>
+  </fieldset>
+
+  <fieldset>
+    <legend>2. Valideurs internes Agro</legend>
+    <table class="validators">
+      <thead>
+        <tr><th>Rôle</th><th>Prénom</th><th>Nom</th><th>Adresse mail</th></tr>
+      </thead>
+      <tbody>
+      {% for role in internal_roles %}
+        <tr>
+          <th>{{ role }}</th>
+          <td><input type="text" name="interne_agro__{{ role }}__first_name"
+                     value="{{ form.get('interne_agro__' ~ role ~ '__first_name', '') }}"></td>
+          <td><input type="text" name="interne_agro__{{ role }}__last_name"
+                     value="{{ form.get('interne_agro__' ~ role ~ '__last_name', '') }}"></td>
+          <td><input type="email" name="interne_agro__{{ role }}__email" required
+                     value="{{ form.get('interne_agro__' ~ role ~ '__email', '') }}"></td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </fieldset>
+
+  <fieldset>
+    <legend>3. Valideurs ITMAI</legend>
+    <table class="validators">
+      <thead>
+        <tr><th>Rôle</th><th>Prénom</th><th>Nom</th><th>Adresse mail</th></tr>
+      </thead>
+      <tbody>
+      {% for role in itmai_roles %}
+        <tr>
+          <th>{{ role }}</th>
+          <td><input type="text" name="itmai__{{ role }}__first_name"
+                     value="{{ form.get('itmai__' ~ role ~ '__first_name', '') }}"></td>
+          <td><input type="text" name="itmai__{{ role }}__last_name"
+                     value="{{ form.get('itmai__' ~ role ~ '__last_name', '') }}"></td>
+          <td><input type="email" name="itmai__{{ role }}__email" required
+                     value="{{ form.get('itmai__' ~ role ~ '__email', '') }}"></td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </fieldset>
+
+  <div class="actions">
+    <button type="submit" class="btn btn-primary">Valider la fiche et lancer le workflow</button>
+  </div>
+</form>
+{% endblock %}

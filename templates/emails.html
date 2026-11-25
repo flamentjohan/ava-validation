@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Mails — AVA{% endblock %}
+{% block content %}
+<h1>Journal des mails — {{ project['name'] }}</h1>
+<p><a class="btn" href="{{ url_for('dashboard') }}">← Tableau de pilotage</a></p>
+{% if not emails %}
+  <p>Aucun mail pour ce projet.</p>
+{% endif %}
+{% for m in emails %}
+<div class="mail-card">
+  <div class="mail-head">
+    <strong>À : {{ m['recipient'] }}</strong>
+    <span class="mail-meta">{{ m['sent_at'] }}
+      {% if m['delivered'] %}<span class="dot dot-valide">Envoyé</span>
+      {% else %}<span class="dot dot-refuse">Non délivré</span>{% endif %}
+    </span>
+  </div>
+  <div class="mail-subject">Objet : {{ m['subject'] }}</div>
+  {% if m['error'] %}<div class="mail-error">{{ m['error'] }}</div>{% endif %}
+  <pre>{{ m['body'] }}</pre>
+</div>
+{% endfor %}
+{% endblock %}

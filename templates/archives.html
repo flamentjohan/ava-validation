@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block title %}Archives — AVA{% endblock %}
+{% block content %}
+<h1>Projets archivés</h1>
+<p class="legend">
+  <span class="dot dot-valide">Validé</span>
+  <span class="dot dot-mail_envoye">En attente de validation</span>
+  <span class="dot dot-refuse">Refusé</span>
+</p>
+
+{% if not projects %}
+  <p>Aucun projet archivé.</p>
+{% endif %}
+
+{% for project in projects %}
+{% set vs = validators_by_project.get(project['id'], []) %}
+<div class="project-block archived-block">
+  <div class="project-head">
+    <h2>{{ project['name'] }}</h2>
+    <span class="status-badge status-{{ project['status'] }}">
+      {% if project['status'] == 'valide' %}>Projet validé
+      {% elif project['status'] == 'refuse' %}Projet refusé
+      {% else %}{{ project['status'] }}
+      {% endif %}
+    </span>
+  </div>
+  <table class="dash">
+    <thead>
+      <tr>
+        <th rowspan="2">UP</th>
+        <th rowspan="2">Date</th>
+        <th rowspan="2">Créateur</th>
+        <th rowspan="2">Groupe / Rôle</th>
+        <th colspan="2">Valideur</th>
+        <th rowspan="2">Statut</th>
+        <th rowspan="2" class="actions-col">Actions</th>
+      </tr>
+      <tr><th>Nom</th><th>Mail</th></tr>
+    </thead>
+    <tbody>
+    {% for v in vs %}
+      <tr>
+        {% if loop.first %}
+        <td rowspan="{{ vs|length }}">{{ project['up'] }}</td>
+        <td rowspan="{{ vs|length }}">{{ project['date'] }}</td>
+        <td rowspan="{{ vs|length }}">{{ project['creator_name'] }}<br><small>{{ project['creator_email'] }}</small></td>
+        {% endif %}
+        <td>{{ ('Agro' if v['grp'] == 'interne_agro' else 'ITMAI') }} — {{ v['role'] }}</td>
+        <td>{{ v['first_name'] }} {{ v['last_name'] }}</td>
+        <td><small>{{ v['email'] }}</small></td>
+        <td>
+          <span class="dot dot-{{ v['status'] }}">{{ status_label(v['status']) }}</span>
+          {% if v['answered_at'] %}<small>le {{ v['answered_at'][:16] }}</small>{% endif %}
+        </td>
+        {% if loop.first %}
+        <td rowspan="{{ vs|length }}" class="actions-col">
+          <div class="block-actions">
+            <form method="post" action="{{ url_for('unarchive_project', project_id=project['id']) }}">
+              <button type="submit" class="btn">Désarchiver</button>
+            </form>
+            <form method="post" action="{{ url_for('delete_project', project_id=project['id']) }}"
+                  onsubmit="return confirm('Supprimer définitivement ce projet ?');">
+              <input type="hidden" name="from" value="archives">
+              <button type="submit" class="btn btn-danger">Supprimer</button>
+            </form>
+          </div>
+        </td>
+        {% endif %}
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endfor %}
+{% endblock %}
