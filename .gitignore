@@ -4,3 +4,4 @@ __pycache__/
 ava.db
 .env
 instance/
+ava.log
