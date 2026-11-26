@@ -272,6 +272,20 @@ tr.rexter td { background: #fffaf3; }
 .spacer-cell { background: transparent !important; }
 .actions-col { width: 175px; }
 
+.head-actions { margin-left: auto; display: flex; gap: .45rem; align-items: center; }
+.head-actions form { margin: 0; }
+.btn-sm { padding: .32rem .7rem; font-size: .8rem; }
+.save-cell { text-align: center; }
+.save-cell small { display: block; margin-top: .4rem; line-height: 1.3; }
+
+table.dash input[type="text"], table.dash input[type="email"] {
+  width: 100%; min-width: 110px; padding: .32rem .5rem; font-size: .86rem;
+}
+table.dash input.dt { width: 135px; }
+table.dash select {
+  width: 100%; min-width: 130px; padding: .32rem .4rem; font-size: .85rem;
+}
+
 .block-actions { display: flex; flex-direction: column; gap: .5rem; align-items: stretch; }
 .block-actions form { margin: 0; }
 .block-actions .btn { width: 100%; text-align: center; }

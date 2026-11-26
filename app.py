@@ -467,6 +467,64 @@ def edit_project(project_id):
                            images=images)
 
 
+@app.post("/projet/<int:project_id>/edition-rapide")
+def quick_edit(project_id):
+    db = get_db()
+    with db:
+        for v in db.execute(
+                "SELECT * FROM validators WHERE project_id=?",
+                (project_id,)).fetchall():
+            p = f"v{v['id']}"
+            status = request.form.get(f"{p}__status")
+            if status is None:
+                continue
+            name = request.form.get(f"{p}__name", "").strip()
+            parts = name.split()
+            first = parts[0] if parts else ""
+            last = " ".join(parts[1:])
+            answered = request.form.get(f"{p}__answered_at", "").strip()
+            if status in ("en_attente", "mail_envoye") and not answered:
+                answered = None
+            db.execute(
+                """UPDATE validators SET first_name=?, last_name=?, email=?,
+                       status=?, answered_at=? WHERE id=?""",
+                (first, last,
+                 request.form.get(f"{p}__email", "").strip(),
+                 status, answered, v["id"]))
+        project = db.execute("SELECT * FROM projects WHERE id=?",
+                             (project_id,)).fetchone()
+        refused = db.execute(
+            "SELECT COUNT(*) c FROM validators WHERE project_id=? AND "
+            "status='refuse'", (project_id,)).fetchone()["c"]
+        if refused:
+            db.execute("UPDATE projects SET status='refuse' WHERE id=?",
+                       (project_id,))
+        elif project["status"] != "refuse":
+            pending = db.execute(
+                "SELECT COUNT(*) c FROM validators WHERE project_id=? AND "
+                "grp='interne_agro' AND email<>'' AND status<>'valide'",
+                (project_id,)).fetchone()["c"]
+            external = [x for x in db.execute(
+                "SELECT * FROM validators WHERE project_id=? AND grp='itmai'",
+                (project_id,)).fetchall() if x["email"]]
+            validated_ext = sum(1 for x in external if x["status"] == "valide")
+            if pending == 0 and project["status"] == "phase_interne":
+                if external and validated_ext < len(external):
+                    db.execute("UPDATE projects SET status='phase_externe' "
+                               "WHERE id=?", (project_id,))
+                    notify_group(db, project, "itmai")
+                    flash("Tous les valideurs internes ont validé : les "
+                          "valideurs ITMAI viennent d'être notifiés.",
+                          "success")
+                else:
+                    finalize(db, project)
+            elif (pending == 0 and project["status"] == "phase_externe"
+                  and external and validated_ext == len(external)):
+                finalize(db, project)
+    flash("Modifications enregistrées.", "success")
+    return redirect(url_for("dashboard"))
+
+
 @app.route("/rapport")
 def rapport():
     mois = request.args.get("mois", type=int)

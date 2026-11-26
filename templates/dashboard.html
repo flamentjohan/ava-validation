@@ -23,7 +23,21 @@
     <a class="project-link" href="{{ url_for('project_detail', project_id=project['id']) }}"
        title="Ouvrir la fiche projet">{{ project['name'] }}</a>
     <span class="status-badge status-{{ project['status'] }}">{{ project_status_label(project['status']) }}</span>
+    <span class="head-actions">
+      <a class="btn btn-sm" href="{{ url_for('edit_project', project_id=project['id']) }}">Modifier</a>
+      <a class="btn btn-sm" href="{{ url_for('project_emails', project_id=project['id']) }}">Mails</a>
+      <form method="post" action="{{ url_for('archive_project', project_id=project['id']) }}"
+            onsubmit="return confirm('Archiver ce projet ?');">
+        <button type="submit" class="btn btn-sm">Archiver</button>
+      </form>
+      <form method="post" action="{{ url_for('delete_project', project_id=project['id']) }}"
+            onsubmit="return confirm('Supprimer définitivement ce projet ?');">
+        <button type="submit" class="btn btn-sm btn-danger">Supprimer</button>
+      </form>
+    </span>
   </div>
+
+  <form method="post" action="{{ url_for('quick_edit', project_id=project['id']) }}">
   <table class="dash">
     <thead>
       <tr>
@@ -31,63 +45,55 @@
         <th rowspan="2">Date</th>
         <th rowspan="2">Responsable projet</th>
         <th rowspan="2">Gain (€)</th>
-        <th colspan="6">Valideurs</th>
-        <th rowspan="2" class="actions-col">Actions</th>
-      </tr>
-      <tr>
-        <th>Rôle</th>
-        <th>Nom</th>
-        <th>Mail</th>
-        <th>Reçu le</th>
-        <th>Validé le</th>
-        <th>Statut</th>
+        <th rowspan="2">Groupe</th>
+        <th rowspan="2">Rôle</th>
+        <th rowspan="2">Nom</th>
+        <th rowspan="2">Mail</th>
+        <th rowspan="2">Reçu le</th>
+        <th rowspan="2">Validé le</th>
+        <th rowspan="2">Statut</th>
+        <th rowspan="2">Actions</th>
       </tr>
     </thead>
     <tbody>
       {% if vs|length == 0 %}
       <tr><td>{{ project['up'] }}</td><td>{{ project['date'] }}</td>
-          <td>{{ project['creator_name'] }}</td><td>{{ project['total_gain'] }}</td>
-          <td colspan="7">Aucun valideur renseigné</td></tr>
+          <td>{{ project['creator_name'] }}<br><small>{{ project['creator_email'] }}</small></td>
+          <td>{{ project['total_gain'] }}</td>
+          <td colspan="8">Aucun valideur renseigné</td></tr>
       {% endif %}
-      {% set rowspan_total = vs|length + (1 if interna|length else 0) + (1 if externa|length else 0) %}
       {% for v in vs %}
-      {% set new_group = loop.first or vs[loop.index0 - 1]['grp'] != v['grp'] %}
-      {% if new_group %}
-      <tr class="group-row g-{{ v['grp'] }}">
-        <td rowspan="{{ rowspan_total }}">{{ project['up'] }}</td>
-        <td rowspan="{{ rowspan_total }}">{{ project['date'] }}</td>
-        <td rowspan="{{ rowspan_total }}">{{ project['creator_name'] }}<br><small>{{ project['creator_email'] }}</small></td>
-        <td rowspan="{{ rowspan_total }}">{{ project['total_gain'] }}</td>
-        <td colspan="6">{{ 'Valideurs internes AGRO' if v['grp'] == 'interne_agro' else 'Valideurs externes ITMAI' }}</td>
+      <tr class="{{ 'rinter' if v['grp'] == 'interne_agro' else 'rexter' }}">
         {% if loop.first %}
-        <td rowspan="{{ rowspan_total }}" class="actions-col">
-          <div class="block-actions">
-            <a class="btn" href="{{ url_for('edit_project', project_id=project['id']) }}">Modifier</a>
-            <a class="btn" href="{{ url_for('project_emails', project_id=project['id']) }}">Mails</a>
-            <form method="post" action="{{ url_for('archive_project', project_id=project['id']) }}"
-                  onsubmit="return confirm('Archiver ce projet ?');">
-              <button type="submit" class="btn">Archiver</button>
-            </form>
-            <form method="post" action="{{ url_for('delete_project', project_id=project['id']) }}"
-                  onsubmit="return confirm('Supprimer définitivement ce projet ?');">
-              <button type="submit" class="btn btn-danger">Supprimer</button>
-            </form>
-          </div>
+        <td rowspan="{{ vs|length }}">{{ project['up'] }}</td>
+        <td rowspan="{{ vs|length }}">{{ project['date'] }}</td>
+        <td rowspan="{{ vs|length }}">{{ project['creator_name'] }}<br><small>{{ project['creator_email'] }}</small></td>
+        <td rowspan="{{ vs|length }}">{{ project['total_gain'] }}</td>
+        <td rowspan="{{ vs|length }}" class="actions-col save-cell">
+          <button type="submit" class="btn btn-sm btn-primary">Enregistrer</button>
+          <small>statuts et réponses<br>enregistrés ici</small>
         </td>
         {% endif %}
-      </tr>
-      {% endif %}
-      <tr class="{{ 'rinter' if v['grp'] == 'interne_agro' else 'rexter' }}">
+        <td><span class="pill {{ 'pill-interne' if v['grp'] == 'interne_agro' else 'pill-externe' }}">{{ 'INTERNE' if v['grp'] == 'interne_agro' else 'ITMAI' }}</span></td>
         <td>{{ v['role'] }}</td>
-        <td>{{ v['first_name'] }} {{ v['last_name'] }}</td>
-        <td><small>{{ v['email'] }}</small></td>
+        <td><input type="text" name="v{{ v['id'] }}__name" value="{{ v['first_name'] }} {{ v['last_name'] }}"></td>
+        <td><input type="email" name="v{{ v['id'] }}__email" value="{{ v['email'] }}"></td>
         <td><small>{{ (v['sent_at'] or '—')[:16] }}</small></td>
-        <td><small>{{ (v['answered_at'] or '—')[:16] }}</small></td>
-        <td><span class="dot dot-{{ v['status'] }}">{{ status_label(v['status']) }}</span></td>
+        <td><input class="dt" type="text" name="v{{ v['id'] }}__answered_at"
+                   value="{{ (v['answered_at'] or '')[:16] }}"
+                   placeholder="2026-11-25 14:30"></td>
+        <td>
+          <select name="v{{ v['id'] }}__status">
+            {% for s in ['en_attente', 'mail_envoye', 'valide', 'refuse'] %}
+            <option value="{{ s }}" {% if v['status'] == s %}selected{% endif %}>{{ status_label(s) }}</option>
+            {% endfor %}
+          </select>
+        </td>
       </tr>
       {% endfor %}
     </tbody>
   </table>
+  </form>
 </div>
 {% endfor %}
 
