@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}Fiche projet — AVA{% endblock %}
+{% block content %}
+<div class="validate-page">
+  <p><a class="btn" href="{{ url_for('dashboard') }}">← Tableau de pilotage</a></p>
+  <h1>{{ project['name'] }}</h1>
+  <span class="status-badge status-{{ project['status'] }}">{{ project_status_label(project['status']) }}</span>
+
+  <section class="panel" style="margin-top:1rem;">
+    <h2>Informations du projet</h2>
+    <dl class="info-grid">
+      <dt>Date</dt><dd>{{ project['date'] }}</dd>
+      <dt>Responsable projet</dt><dd>{{ project['creator_name'] }} — {{ project['creator_email'] }}</dd>
+      <dt>UP concernée</dt><dd>{{ project['up'] }}</dd>
+      <dt>Temps de développement nécessaire</dt><dd>{{ project['launch_delay_months'] }} mois à partir de la validation</dd>
+      <dt>Gain total estimé</dt><dd>{{ project['total_gain'] }} €</dd>
+      <dt>Statut</dt><dd>{{ project_status_label(project['status']) }}</dd>
+      {% if project['archived'] %}<dt>Archivé</dt><dd>Oui</dd>{% endif %}
+    </dl>
+    <h3>Descriptif détaillé</h3>
+    <p class="description">{{ project['description'] }}</p>
+    {% if images %}
+    <h3>Images du projet</h3>
+    <div class="thumbs">
+      {% for im in images %}
+      <a href="{{ url_for('image_file', image_id=im['id']) }}" target="_blank" class="thumb">
+        <img src="{{ url_for('image_file', image_id=im['id']) }}" alt="Image du projet">
+      </a>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </section>
+
+  <section class="panel">
+    <h2>Circuit de validation</h2>
+    <table class="dash detail-validators">
+      <thead>
+        <tr><th>Groupe</th><th>Rôle</th><th>Nom</th><th>Mail</th>
+            <th>Reçu le</th><th>Validé le</th><th>Statut</th></tr>
+      </thead>
+      <tbody>
+      {% for v in validators %}
+      <tr class="{{ 'rinter' if v['grp'] == 'interne_agro' else 'rexter' }}">
+        <td><span class="pill {{ 'pill-interne' if v['grp'] == 'interne_agro' else 'pill-externe' }}">{{ 'INTERNE AGRO' if v['grp'] == 'interne_agro' else 'ITMAI' }}</span></td>
+        <td>{{ v['role'] }}</td>
+        <td>{{ v['first_name'] }} {{ v['last_name'] }}</td>
+        <td><small>{{ v['email'] }}</small></td>
+        <td><small>{{ (v['sent_at'] or '—')[:16] }}</small></td>
+        <td><small>{{ (v['answered_at'] or '—')[:16] }}</small></td>
+        <td><span class="dot dot-{{ v['status'] }}">{{ status_label(v['status']) }}</span></td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    <div class="block-actions" style="flex-direction:row; margin-top:1rem;">
+      <a class="btn btn-primary" href="{{ url_for('edit_project', project_id=project['id']) }}">Modifier</a>
+      <a class="btn" href="{{ url_for('project_emails', project_id=project['id']) }}">Voir les mails</a>
+    </div>
+  </section>
+</div>
+{% endblock %}

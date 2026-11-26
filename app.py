@@ -479,6 +479,27 @@ def rapport():
                      as_attachment=True)
 
 
+@app.route("/projet/<int:project_id>")
+def project_detail(project_id):
+    db = get_db()
+    project = db.execute("SELECT * FROM projects WHERE id=?",
+                         (project_id,)).fetchone()
+    if project is None:
+        flash("Projet introuvable.", "danger")
+        return redirect(url_for("dashboard"))
+    validators = db.execute(
+        "SELECT * FROM validators WHERE project_id=? AND "
+        "(email<>'' OR first_name<>'' OR last_name<>'') ORDER BY id",
+        (project_id,)).fetchall()
+    images = db.execute(
+        "SELECT id FROM images WHERE project_id=? ORDER BY id",
+        (project_id,)).fetchall()
+    return render_template("project_detail.html", project=project,
+                           validators=validators, images=images,
+                           status_label=validator_status_label,
+                           project_status_label=project_status_label)
+
+
 @app.post("/projet/<int:project_id>/archiver")
 def archive_project(project_id):
     with get_db() as db:
