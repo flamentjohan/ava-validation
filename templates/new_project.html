@@ -1,10 +1,18 @@
 {% extends "base.html" %}
 {% block title %}Nouveau projet — AVA{% endblock %}
 {% block content %}
-<h1>Fiche projet</h1>
+<div class="page-hero">
+  <div>
+    <h1>Fiche projet</h1>
+    <p>Décrivez votre proposition de projet et lancez le circuit de validation</p>
+  </div>
+  <div class="hero-right">
+    <p>Selon la procédure de validation AVA</p>
+  </div>
+</div>
 <form method="post" class="fiche" id="fiche-form">
   <fieldset>
-    <legend>1. Informations du projet</legend>
+    <legend><span class="secnum">1</span> Informations du projet</legend>
     <div class="grid">
       <label>Nom du projet
         <input type="text" name="name" required
@@ -54,7 +62,7 @@
   </fieldset>
 
   <fieldset>
-    <legend>2. Valideurs internes Agro</legend>
+    <legend><span class="secnum">2</span> Valideurs internes Agro</legend>
     <p class="hint">Au moins un valideur interne est nécessaire ; les lignes laissées vides sont ignorées et ne bloquent pas la validation.</p>
     <table class="validators">
       <thead>
@@ -77,7 +85,7 @@
   </fieldset>
 
   <fieldset>
-    <legend>3. Valideurs ITMAI</legend>
+    <legend><span class="secnum">3</span> Valideurs ITMAI</legend>
     <p class="hint">Ils ne seront notifiés qu'après validation de tous les valideurs internes renseignés.</p>
     <table class="validators">
       <thead>

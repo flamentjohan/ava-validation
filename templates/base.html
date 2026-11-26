@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}AVA{% endblock %}</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=4">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=5">
 </head>
 <body>
   <header class="topbar">
@@ -13,7 +13,9 @@
       <a href="{{ url_for('new_project') }}"
          {% if request.path == '/nouveau-projet' %}class="active"{% endif %}>Nouveau projet</a>
       <a href="{{ url_for('dashboard') }}"
-         {% if request.path.startswith('/tableau') or request.path.startswith('/projet') or request.path.startswith('/rapport') %}class="active"{% endif %}>Tableau de pilotage</a>
+         {% if request.path.startswith('/tableau') or request.path.startswith('/projet') %}class="active"{% endif %}>Tableau de pilotage</a>
+      <a href="{{ url_for('reporting') }}"
+         {% if request.path.startswith('/reporting') or request.path.startswith('/rapport') %}class="active"{% endif %}>Dashboard AVA</a>
       <a href="{{ url_for('archives') }}"
          {% if request.path == '/archives' %}class="active"{% endif %}>Archives</a>
     </nav>

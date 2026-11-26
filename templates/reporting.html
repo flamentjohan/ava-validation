@@ -1,0 +1,149 @@
+{% extends "base.html" %}
+{% block title %}Dashboard AVA — AVA{% endblock %}
+{% block content %}
+<div class="page-hero">
+  <div>
+    <h1>Dashboard AVA</h1>
+    <p>Suivi des propositions de projet en direct</p>
+  </div>
+  <div class="hero-right">
+    <div class="segmented">
+      <a href="{{ url_for('reporting', mois=12) }}"
+         {% if mois == 12 %}class="on"{% endif %}>12 mois</a>
+      <a href="{{ url_for('reporting', mois=24) }}"
+         {% if mois == 24 %}class="on"{% endif %}>24 mois</a>
+    </div>
+    <p>du {{ d.debut }} au {{ d.fin }}</p>
+  </div>
+</div>
+
+<section class="panel sec">
+  <div class="section-head"><span class="secnum">1</span><h2>Vue d'ensemble de la période</h2></div>
+  <div class="kpi-grid">
+    <div class="kpi-card a-navy">
+      <div class="kpi-label">Projets créés</div>
+      <div class="kpi-value">{{ d.n }}</div>
+      <div class="kpi-sub">sur la période selectionnée</div>
+    </div>
+    <div class="kpi-card a-orange">
+      <div class="kpi-label">Validés en interne</div>
+      <div class="kpi-value">{{ d.n_inter }}</div>
+      <div class="kpi-sub">soit {{ '%.1f'|format(d.pct_inter)|replace('.', ',') }} % des projets</div>
+    </div>
+    <div class="kpi-card a-green">
+      <div class="kpi-label">Validés après circuit complet</div>
+      <div class="kpi-value">{{ d.n_exter }}</div>
+      <div class="kpi-sub">soit {{ '%.1f'|format(d.pct_exter)|replace('.', ',') }} % des projets</div>
+    </div>
+    <div class="kpi-card a-red">
+      <div class="kpi-label">Refusés</div>
+      <div class="kpi-value">{{ d.n_refuse }}</div>
+      <div class="kpi-sub">{{ d.n_encours }} encore en cours</div>
+    </div>
+  </div>
+</section>
+
+<section class="panel sec">
+  <div class="section-head"><span class="secnum">2</span><h2>Avancement de la validation</h2></div>
+  <div class="prog-block">
+    <div class="prog-align clear">
+      <span class="prog-l">VALIDATION INTERNE AGRO</span>
+      <span class="prog-r">{{ d.n_inter }} / {{ d.n }} projets</span>
+    </div>
+    <div class="progress"><span class="fill-orange" style="width: {{ [d.pct_inter, 100]|min }}%"></span></div>
+    <div class="prog-pct">{{ '%.1f'|format(d.pct_inter)|replace('.', ',') }} %</div>
+  </div>
+  <div class="prog-block">
+    <div class="prog-align clear">
+      <span class="prog-l">VALIDATION TOTALE (CIRCUIT COMPLET)</span>
+      <span class="prog-r">{{ d.n_exter }} / {{ d.n }} projets</span>
+    </div>
+    <div class="progress"><span class="fill-green" style="width: {{ [d.pct_exter, 100]|min }}%"></span></div>
+    <div class="prog-pct">{{ '%.1f'|format(d.pct_exter)|replace('.', ',') }} %</div>
+  </div>
+</section>
+
+<section class="panel sec">
+  <div class="section-head"><span class="secnum">3</span><h2>Gains</h2></div>
+  <div class="kpi-grid">
+    <div class="kpi-card a-navy">
+      <div class="kpi-label">Gain total proposé</div>
+      <div class="kpi-value">{{ '{:,.0f}'.format(d.gain_propose)|replace(',', ' ') }} €</div>
+      <div class="kpi-sub">ensemble des projets</div>
+    </div>
+    <div class="kpi-card a-green">
+      <div class="kpi-label">Gain total validé</div>
+      <div class="kpi-value">{{ '{:,.0f}'.format(d.gain_valide)|replace(',', ' ') }} €</div>
+      <div class="kpi-sub">projets validés</div>
+    </div>
+    <div class="kpi-card a-teal">
+      <div class="kpi-label">Gain validé / proposé</div>
+      <div class="kpi-value">{{ '%.1f'|format(d.pct_gain)|replace('.', ',') }} %</div>
+      <div class="kpi-sub">part du gain concrétisée</div>
+    </div>
+  </div>
+  <div class="prog-block">
+    <div class="prog-align clear">
+      <span class="prog-l">CONCRÉTISATION DU GAIN</span>
+      <span class="prog-r">{{ '{:,.0f}'.format(d.gain_valide)|replace(',', ' ') }} €</span>
+    </div>
+    <div class="progress"><span class="fill-teal" style="width: {{ [d.pct_gain, 100]|min }}%"></span></div>
+    <div class="prog-pct">{{ '%.1f'|format(d.pct_gain)|replace('.', ',') }} %</div>
+  </div>
+</section>
+
+<section class="panel sec">
+  <div class="section-head"><span class="secnum">4</span><h2>Répartition par UP</h2></div>
+  <div class="charts-grid">
+    <div class="chart-panel">
+      <h3>Nombre de projets par UP</h3>
+      {% if not d.up_projets %}<p class="hint">Aucun projet sur la période.</p>{% endif %}
+      {% set maxp = d.up_projets.values()|max if d.up_projets else 1 %}
+      {% for up, cnt in d.up_projets.items()|sort(attribute='1', reverse=true) %}
+      <div class="hbar">
+        <span class="hbar-label">{{ up }}</span>
+        <span class="hbar-track"><span class="hbar-fill f-navy" style="width: {{ (100 * cnt / maxp)|round(1) }}%"></span></span>
+        <span class="hbar-num">{{ cnt }}</span>
+      </div>
+      {% endfor %}
+    </div>
+    <div class="chart-panel">
+      <h3>Gain par UP (en €)</h3>
+      {% if not d.up_gain %}<p class="hint">Aucun gain sur la période.</p>{% endif %}
+      {% set maxg = d.up_gain.values()|max if d.up_gain else 1 %}
+      {% for up, g in d.up_gain.items()|sort(attribute='1', reverse=true) %}
+      <div class="hbar">
+        <span class="hbar-label">{{ up }}</span>
+        <span class="hbar-track"><span class="hbar-fill f-green" style="width: {{ (100 * g / maxg)|round(1) }}%"></span></span>
+        <span class="hbar-num">{{ '{:,.0f}'.format(g)|replace(',', ' ') }}</span>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<section class="panel sec">
+  <div class="section-head"><span class="secnum">5</span><h2>Réactivité du circuit de validation</h2></div>
+  <div class="kpi-grid">
+    <div class="kpi-card a-orange">
+      <div class="kpi-label">Validation interne</div>
+      <div class="kpi-value">{{ '%.1f'|format(d.delai_inter)|replace('.', ',') }} j</div>
+      <div class="kpi-sub">délai moyen jusqu'à validation complète</div>
+    </div>
+    <div class="kpi-card a-orange">
+      <div class="kpi-label">Validation ITMAI</div>
+      <div class="kpi-value">{{ '%.1f'|format(d.delai_exter)|replace('.', ',') }} j</div>
+      <div class="kpi-sub">délai moyen de la phase externe</div>
+    </div>
+    <div class="kpi-card a-navy">
+      <div class="kpi-label">Délai total moyen</div>
+      <div class="kpi-value">{{ '%.1f'|format(d.delai_inter + d.delai_exter)|replace('.', ',') }} j</div>
+      <div class="kpi-sub">de la création à la validation finale</div>
+    </div>
+  </div>
+  <p class="legend" style="margin-top:1rem;">
+    Version web du dashboard — le <a href="{{ url_for('rapport') }}">mode reporting</a>
+    permet de télécharger le même reporting au format PDF (12 ou 24 mois).
+  </p>
+</section>
+{% endblock %}

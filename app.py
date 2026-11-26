@@ -525,6 +525,16 @@ def quick_edit(project_id):
     return redirect(url_for("dashboard"))
 
 
+@app.route("/reporting")
+def reporting():
+    mois = request.args.get("mois", type=int) or 12
+    if mois not in (12, 24):
+        mois = 12
+    from rapport_pdf import collect
+    data = collect(get_db(), mois)
+    return render_template("reporting.html", d=data, mois=mois)
+
+
 @app.route("/rapport")
 def rapport():
     mois = request.args.get("mois", type=int)
